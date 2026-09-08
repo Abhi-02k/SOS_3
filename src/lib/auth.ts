@@ -4,50 +4,8 @@ import { supabase } from './supabaseClient';
 const SESSION_KEY = 'sos_guardian_auth_session';
 const PROFILES_STORAGE_KEY = 'sos_guardian_local_profiles';
 
-// Default initial profiles
-const DEFAULT_PROFILES: UserProfile[] = [
-  {
-    id: 'usr_admin_001',
-    email: 'admin@guardian.sos',
-    fullName: 'Commander Alex Vance',
-    role: 'ADMIN',
-    phone: '+1 (555) 911-0001',
-    deviceId: 'DISPATCH-HQ-01',
-    emergencyContacts: [],
-    onboardingCompleted: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'usr_disp_002',
-    email: 'dispatcher@guardian.sos',
-    fullName: 'Officer Sarah Connor',
-    role: 'DISPATCHER',
-    phone: '+1 (555) 911-0002',
-    deviceId: 'DISPATCH-UNIT-02',
-    emergencyContacts: [],
-    onboardingCompleted: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'usr_citizen_003',
-    email: 'citizen@guardian.sos',
-    fullName: 'John Doe (Driver)',
-    role: 'CITIZEN',
-    phone: '+1 (555) 911-0003',
-    deviceId: 'GUARDIAN-MOBILE-7821',
-    emergencyContacts: [
-      {
-        name: 'Jane Doe',
-        relationship: 'Spouse',
-        phone: '+1 (555) 999-8877',
-      },
-    ],
-    bloodGroup: 'O+',
-    medicalNotes: 'No known drug allergies',
-    onboardingCompleted: true,
-    createdAt: new Date().toISOString(),
-  },
-];
+// Default profiles (empty for production)
+const DEFAULT_PROFILES: UserProfile[] = [];
 
 /**
  * Retrieve current persistent session from localStorage
@@ -222,58 +180,6 @@ export async function signInWithGoogle(): Promise<{ error?: string; url?: string
     console.warn('Supabase Google OAuth:', message);
     return { error: message };
   }
-}
-
-/**
- * Simulated Instant Google Login (for testing before Google Cloud Console keys are entered)
- */
-export async function loginWithGoogleMock(email: string, name?: string): Promise<UserProfile> {
-  const cleanEmail = email.trim().toLowerCase();
-  const profiles = getLocalProfiles();
-  const found = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
-
-  // Automatic role recognition:
-  // If email has 'admin' or matches existing admin -> ADMIN
-  // If email has 'dispatch' -> DISPATCHER
-  // Else -> CITIZEN
-  let assignedRole: UserRole = 'CITIZEN';
-  if (found) {
-    assignedRole = found.role;
-  } else if (cleanEmail.includes('admin')) {
-    assignedRole = 'ADMIN';
-  } else if (cleanEmail.includes('dispatch')) {
-    assignedRole = 'DISPATCHER';
-  }
-
-  const user: UserProfile = {
-    id: found?.id || `usr_g_${Date.now()}`,
-    email: cleanEmail,
-    fullName: name || cleanEmail.split('@')[0],
-    role: assignedRole,
-    phone: found?.phone,
-    deviceId: found?.deviceId || `DEV-G-${Math.floor(1000 + Math.random() * 9000)}`,
-    emergencyContacts: found?.emergencyContacts || [],
-    onboardingCompleted: assignedRole !== 'CITIZEN' ? true : Boolean(found?.onboardingCompleted),
-    createdAt: found?.createdAt || new Date().toISOString(),
-    lastLogin: new Date().toISOString(),
-  };
-
-  const idx = profiles.findIndex((p) => p.id === user.id || p.email.toLowerCase() === cleanEmail);
-  if (idx >= 0) profiles[idx] = user;
-  else profiles.push(user);
-  saveLocalProfiles(profiles);
-
-  saveStoredSession({ user, expiresAt: Date.now() + 30 * 24 * 3600 * 1000 });
-
-  try {
-    await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(user),
-    });
-  } catch {}
-
-  return user;
 }
 
 /**

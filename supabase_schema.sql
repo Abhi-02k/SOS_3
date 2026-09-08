@@ -256,57 +256,6 @@ BEGIN
     END IF;
 END $$;
 
--- ==============================================================================
--- 10. Initial Seed Data (Pre-configured Admins & Driver Profile)
--- ==============================================================================
-INSERT INTO public.profiles (
-    id, email, full_name, role, phone, device_id, blood_group, medical_notes, emergency_contacts, onboarding_completed
-)
-VALUES 
-  (
-    'usr_admin_001',
-    'admin@guardian.sos',
-    'Commander Alex Vance',
-    'ADMIN',
-    '+1 (555) 911-0001',
-    'DISPATCH-HQ-01',
-    'O+',
-    'No known medical conditions',
-    '[]'::jsonb,
-    TRUE
-  ),
-  (
-    'usr_disp_002',
-    'dispatcher@guardian.sos',
-    'Officer Sarah Connor',
-    'DISPATCHER',
-    '+1 (555) 911-0002',
-    'DISPATCH-UNIT-02',
-    'A+',
-    'No allergies',
-    '[]'::jsonb,
-    TRUE
-  ),
-  (
-    'usr_citizen_003',
-    'citizen@guardian.sos',
-    'John Doe (Driver)',
-    'CITIZEN',
-    '+1 (555) 911-0003',
-    'GUARDIAN-MOBILE-7821',
-    'O+',
-    'Asthma, carries inhaler',
-    '[{"name": "Jane Doe", "relationship": "Spouse", "phone": "+1 (555) 999-8877"}]'::jsonb,
-    TRUE
-  )
-ON CONFLICT (email) DO UPDATE SET
-    role = EXCLUDED.role,
-    phone = EXCLUDED.phone,
-    blood_group = EXCLUDED.blood_group,
-    medical_notes = EXCLUDED.medical_notes,
-    emergency_contacts = EXCLUDED.emergency_contacts,
-    onboarding_completed = EXCLUDED.onboarding_completed;
-
 -- Verification Queries
 SELECT count(*) AS total_profiles FROM public.profiles;
 SELECT count(*) AS active_emergencies FROM public.emergencies;

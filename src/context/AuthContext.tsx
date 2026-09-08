@@ -9,7 +9,6 @@ import {
   loginWithEmail,
   registerUser,
   signInWithGoogle,
-  loginWithGoogleMock,
   updateUserProfile,
   getLocalProfiles,
   saveLocalProfiles,
@@ -29,7 +28,6 @@ interface AuthContextType {
   login: (email: string, role?: UserRole) => Promise<UserProfile>;
   register: (email: string, fullName: string, role: UserRole, phone?: string) => Promise<UserProfile>;
   loginGoogle: () => Promise<void>;
-  loginGoogleDemo: (email: string, name?: string) => Promise<UserProfile>;
   updateProfile: (data: Partial<UserProfile>) => Promise<UserProfile>;
   logout: () => void;
   isInstallable: boolean;
@@ -184,17 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginGoogleDemo = async (email: string, name?: string): Promise<UserProfile> => {
-    setIsLoading(true);
-    try {
-      const profile = await loginWithGoogleMock(email, name);
-      setUser(profile);
-      return profile;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const updateProfile = async (data: Partial<UserProfile>): Promise<UserProfile> => {
     setIsLoading(true);
     try {
@@ -232,7 +219,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         loginGoogle,
-        loginGoogleDemo,
         updateProfile,
         logout,
         isInstallable,

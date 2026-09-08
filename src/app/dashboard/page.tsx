@@ -50,7 +50,6 @@ export default function DispatchDashboardPage() {
   const [filter, setFilter] = useState<'ALL' | 'AUTO' | 'MANUAL'>('ALL');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isMounted, setIsMounted] = useState(false);
 
@@ -153,40 +152,6 @@ export default function DispatchDashboardPage() {
     }
   };
 
-  // Quick Simulation Injector for Instant Testing
-  const handleSimulateIncident = async (type: EmergencyType = 'AUTO') => {
-    setIsSimulating(true);
-    // Generate incident around San Francisco with slight jitter
-    const lat = 37.7749 + (Math.random() - 0.5) * 0.05;
-    const lng = -122.4194 + (Math.random() - 0.5) * 0.05;
-    const deviceId = `SIM-${type}-${Math.floor(100 + Math.random() * 900)}`;
-
-    try {
-      const res = await fetch('/api/sos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId,
-          lat,
-          lng,
-          type,
-          speed: type === 'AUTO' ? 68 : 0,
-          accuracy: 5,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        await fetchEmergencies();
-        if (data.emergencyId) setSelectedId(data.emergencyId);
-      }
-    } catch (err) {
-      console.error('Failed to inject simulated incident:', err);
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
   // Filtered incidents
   const filteredEmergencies = emergencies.filter((e) => {
     if (filter === 'AUTO') return e.type === 'AUTO';
@@ -244,26 +209,6 @@ export default function DispatchDashboardPage() {
               <VolumeX className="w-4 h-4 text-slate-500" />
             )}
           </button>
-
-          {/* Quick Simulation Injector */}
-          <div className="hidden sm:flex items-center space-x-1">
-            <button
-              onClick={() => handleSimulateIncident('AUTO')}
-              disabled={isSimulating}
-              className="px-2.5 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 border border-red-700 text-red-200 text-xs font-bold flex items-center space-x-1.5 transition-all active:scale-95"
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-              <span>Simulate Crash</span>
-            </button>
-            <button
-              onClick={() => handleSimulateIncident('MANUAL')}
-              disabled={isSimulating}
-              className="px-2.5 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700 text-amber-200 text-xs font-bold flex items-center space-x-1.5 transition-all active:scale-95"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Simulate SOS</span>
-            </button>
-          </div>
 
           {/* Admin User Management */}
           <Link
@@ -386,16 +331,8 @@ export default function DispatchDashboardPage() {
                 <div>
                   <h3 className="text-sm font-bold text-slate-300">All Sectors Clear</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    No active emergency beacons or crash impacts detected.
+                    No active emergency beacons or crash impacts detected across the network.
                   </p>
-                </div>
-                <div className="pt-2 flex flex-col gap-2 w-full">
-                  <button
-                    onClick={() => handleSimulateIncident('AUTO')}
-                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition-colors"
-                  >
-                    Simulate Auto Crash Event
-                  </button>
                 </div>
               </div>
             ) : (

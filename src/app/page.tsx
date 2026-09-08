@@ -7,11 +7,8 @@ import Logo from '@/components/ui/Logo';
 import FooterCredit from '@/components/ui/FooterCredit';
 import {
   Lock,
-  ArrowRight,
   AlertCircle,
   Download,
-  ShieldCheck,
-  UserCheck,
   LogOut,
   ChevronRight,
 } from 'lucide-react';
@@ -23,7 +20,6 @@ export default function StrictGoogleAuthPage() {
     isAuthenticated,
     isLoading,
     loginGoogle,
-    loginGoogleDemo,
     logout,
     isInstallable,
     installPwa,
@@ -48,7 +44,7 @@ export default function StrictGoogleAuthPage() {
     }
   };
 
-  // Primary: Google Sign In via Supabase OAuth
+  // Primary: Real Google Sign In via Supabase OAuth
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
     setIsAuthenticating(true);
@@ -57,31 +53,7 @@ export default function StrictGoogleAuthPage() {
       // Supabase redirects to Google OAuth endpoint automatically
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google OAuth failed';
-      if (
-        msg.includes('provider is not enabled') ||
-        msg.includes('oauth') ||
-        msg.includes('fetch')
-      ) {
-        setErrorMsg(
-          'Google Provider is pending in your Supabase Dashboard. Use the Instant 1-Click buttons below to test client and admin access immediately!'
-        );
-      } else {
-        setErrorMsg(msg);
-      }
-      setIsAuthenticating(false);
-    }
-  };
-
-  // Instant 1-Click Google Test Sign-in
-  const handleInstantGoogleLogin = async (email: string, name: string) => {
-    setErrorMsg('');
-    setIsAuthenticating(true);
-    try {
-      const profile = await loginGoogleDemo(email, name);
-      directUserByRole(profile);
-    } catch {
-      setErrorMsg('Login failed.');
-    } finally {
+      setErrorMsg(msg);
       setIsAuthenticating(false);
     }
   };
@@ -116,7 +88,7 @@ export default function StrictGoogleAuthPage() {
         )}
       </header>
 
-      {/* Strict Centered Login Box — NO FRONT MARKETING PAGES */}
+      {/* Strict Centered Login Box — NO DEMOS OR MARKETING FLUFF */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 z-10 my-6">
         <div className="max-w-md w-full bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 backdrop-blur text-center space-y-6 animate-in zoom-in-95 duration-200">
           {/* Glowing Lock Badge */}
@@ -145,7 +117,7 @@ export default function StrictGoogleAuthPage() {
             </div>
           )}
 
-          {/* Active Session Quick Resume Card (if already authenticated) */}
+          {/* Active Session Card (if already authenticated) */}
           {isAuthenticated && user && (
             <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-left space-y-3">
               <div className="flex items-center justify-between">
@@ -201,8 +173,8 @@ export default function StrictGoogleAuthPage() {
             </div>
           )}
 
-          {/* PRIMARY GOOGLE SIGN-IN BUTTON */}
-          <div className="space-y-3 pt-1">
+          {/* PRIMARY REAL GOOGLE SIGN-IN BUTTON */}
+          <div className="pt-1">
             <button
               onClick={handleGoogleSignIn}
               disabled={isAuthenticating}
@@ -229,39 +201,6 @@ export default function StrictGoogleAuthPage() {
               </svg>
               <span>{isAuthenticating ? 'Connecting to Google...' : 'Sign in with Google'}</span>
             </button>
-
-            {/* Instant 1-Click Testing Logins (Instant Google Demo) */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest block font-bold font-mono">
-                Instant 1-Click Sign-In
-              </span>
-
-              <button
-                type="button"
-                onClick={() => handleInstantGoogleLogin('driver@gmail.com', 'Alex Vance (Driver)')}
-                disabled={isAuthenticating}
-                className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs flex items-center justify-between px-3 border border-slate-700 transition-all cursor-pointer"
-              >
-                <div className="flex items-center space-x-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Login as Client / Driver</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleInstantGoogleLogin('admin@gmail.com', 'Commander Alex (Admin)')}
-                disabled={isAuthenticating}
-                className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs flex items-center justify-between px-3 border border-slate-700 transition-all cursor-pointer"
-              >
-                <div className="flex items-center space-x-2">
-                  <UserCheck className="w-3.5 h-3.5 text-red-400" />
-                  <span>Login as Admin (Auto-Redirects to Dashboard)</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-            </div>
           </div>
         </div>
       </main>

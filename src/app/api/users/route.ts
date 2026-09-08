@@ -16,59 +16,8 @@ if (supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith('http')) {
   }
 }
 
-// In-memory fallback profiles
-const inMemoryProfiles: Map<string, UserProfile> = new Map([
-  [
-    'usr_admin_001',
-    {
-      id: 'usr_admin_001',
-      email: 'admin@guardian.sos',
-      fullName: 'Commander Alex Vance',
-      role: 'ADMIN',
-      phone: '+1 (555) 911-0001',
-      deviceId: 'DISPATCH-HQ-01',
-      emergencyContacts: [],
-      onboardingCompleted: true,
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  [
-    'usr_disp_002',
-    {
-      id: 'usr_disp_002',
-      email: 'dispatcher@guardian.sos',
-      fullName: 'Officer Sarah Connor',
-      role: 'DISPATCHER',
-      phone: '+1 (555) 911-0002',
-      deviceId: 'DISPATCH-UNIT-02',
-      emergencyContacts: [],
-      onboardingCompleted: true,
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  [
-    'usr_citizen_003',
-    {
-      id: 'usr_citizen_003',
-      email: 'citizen@guardian.sos',
-      fullName: 'John Doe (Driver)',
-      role: 'CITIZEN',
-      phone: '+1 (555) 911-0003',
-      deviceId: 'GUARDIAN-MOBILE-7821',
-      emergencyContacts: [
-        {
-          name: 'Jane Doe',
-          relationship: 'Spouse',
-          phone: '+1 (555) 999-8877',
-        },
-      ],
-      bloodGroup: 'O+',
-      medicalNotes: 'No known drug allergies',
-      onboardingCompleted: true,
-      createdAt: new Date().toISOString(),
-    },
-  ],
-]);
+// In-memory fallback profiles (empty for production)
+const inMemoryProfiles: Map<string, UserProfile> = new Map();
 
 export async function GET() {
   try {
