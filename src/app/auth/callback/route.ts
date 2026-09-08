@@ -17,17 +17,20 @@ export async function GET(req: NextRequest) {
         const user = data.session.user;
         const email = user.email || '';
 
-        // Fetch user profile from database to determine role
+        // Fetch user profile from database to determine role & onboarding state
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, onboarding_completed')
           .eq('email', email.toLowerCase())
           .single();
 
         const role = profile?.role || 'CITIZEN';
+        const onboardingCompleted = Boolean(profile?.onboarding_completed);
 
         if (role === 'ADMIN' || role === 'DISPATCHER') {
           return NextResponse.redirect(new URL('/dashboard', requestUrl.origin));
+        } else if (!onboardingCompleted) {
+          return NextResponse.redirect(new URL('/onboarding', requestUrl.origin));
         } else {
           return NextResponse.redirect(new URL('/mobile', requestUrl.origin));
         }
