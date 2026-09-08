@@ -8,6 +8,8 @@ import {
   clearStoredSession,
   loginWithEmail,
   registerUser,
+  signInWithGoogle,
+  loginWithGoogleMock,
 } from '@/lib/auth';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -22,6 +24,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, role?: UserRole) => Promise<UserProfile>;
   register: (email: string, fullName: string, role: UserRole, phone?: string) => Promise<UserProfile>;
+  loginGoogle: () => Promise<void>;
+  loginGoogleDemo: (email: string, name?: string) => Promise<UserProfile>;
   logout: () => void;
   isInstallable: boolean;
   installPwa: () => Promise<void>;
@@ -91,6 +95,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginGoogle = async () => {
+    const result = await signInWithGoogle();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+  };
+
+  const loginGoogleDemo = async (email: string, name?: string): Promise<UserProfile> => {
+    setIsLoading(true);
+    try {
+      const profile = await loginWithGoogleMock(email, name);
+      setUser(profile);
+      return profile;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     clearStoredSession();
     setUser(null);
@@ -115,6 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         register,
+        loginGoogle,
+        loginGoogleDemo,
         logout,
         isInstallable,
         installPwa,
