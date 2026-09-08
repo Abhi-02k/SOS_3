@@ -72,11 +72,14 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (!isLoading && isMounted) {
       if (!isAuthenticated || !user) {
-        router.push('/');
+        const t = setTimeout(() => router.push('/'), 10);
+        return () => clearTimeout(t);
       } else if (user.role === 'ADMIN' || user.role === 'DISPATCHER') {
-        router.push('/dashboard');
+        const t = setTimeout(() => router.push('/dashboard'), 10);
+        return () => clearTimeout(t);
       } else if (user.onboardingCompleted) {
-        router.push('/mobile');
+        const t = setTimeout(() => router.push('/mobile'), 10);
+        return () => clearTimeout(t);
       } else {
         // Pre-fill existing fields if available
         if (user.phone) setPhone(user.phone);

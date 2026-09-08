@@ -38,9 +38,11 @@ export default function DispatchDashboardPage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push('/');
+        const t = setTimeout(() => router.push('/'), 10);
+        return () => clearTimeout(t);
       } else if (user?.role === 'CITIZEN') {
-        router.push('/mobile');
+        const t = setTimeout(() => router.push('/mobile'), 10);
+        return () => clearTimeout(t);
       }
     }
   }, [isLoading, isAuthenticated, user, router]);

@@ -35,9 +35,11 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push('/');
+        const t = setTimeout(() => router.push('/'), 10);
+        return () => clearTimeout(t);
       } else if (user?.role !== 'ADMIN') {
-        router.push(user?.role === 'DISPATCHER' ? '/dashboard' : '/mobile');
+        const t = setTimeout(() => router.push(user?.role === 'DISPATCHER' ? '/dashboard' : '/mobile'), 10);
+        return () => clearTimeout(t);
       }
     }
   }, [isAuthenticated, isLoading, user, router]);

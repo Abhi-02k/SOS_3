@@ -45,9 +45,11 @@ export default function MobileEmergencyPage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated || !user) {
-        router.push('/');
+        const t = setTimeout(() => router.push('/'), 10);
+        return () => clearTimeout(t);
       } else if (!user.onboardingCompleted) {
-        router.push('/onboarding');
+        const t = setTimeout(() => router.push('/onboarding'), 10);
+        return () => clearTimeout(t);
       }
     }
   }, [isLoading, isAuthenticated, user, router]);
