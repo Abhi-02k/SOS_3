@@ -83,11 +83,13 @@ export async function GET() {
           id: String(row.id || ''),
           email: String(row.email || ''),
           fullName: String(row.full_name || ''),
+          avatarUrl: typeof row.avatar_url === 'string' ? row.avatar_url : undefined,
           role: (row.role as UserProfile['role']) || 'CITIZEN',
           phone: typeof row.phone === 'string' ? row.phone : undefined,
           deviceId: typeof row.device_id === 'string' ? row.device_id : undefined,
           bloodGroup: typeof row.blood_group === 'string' ? row.blood_group : undefined,
           medicalNotes: typeof row.medical_notes === 'string' ? row.medical_notes : undefined,
+          vehicleInfo: typeof row.vehicle_info === 'string' ? row.vehicle_info : undefined,
           emergencyContacts: Array.isArray(row.emergency_contacts)
             ? (row.emergency_contacts as UserProfile['emergencyContacts'])
             : [],
@@ -121,14 +123,20 @@ export async function POST(req: NextRequest) {
       try {
         await supabaseAdmin.from('profiles').upsert({
           id: body.id || `usr_${Date.now()}`,
-          email: body.email,
+          email: body.email.toLowerCase(),
           full_name: body.fullName || 'User',
+          avatar_url: body.avatarUrl || null,
           role: body.role || 'CITIZEN',
           phone: body.phone || null,
           device_id: body.deviceId || null,
+          blood_group: body.bloodGroup || null,
+          medical_notes: body.medicalNotes || null,
+          vehicle_info: body.vehicleInfo || null,
+          emergency_contacts: body.emergencyContacts || [],
+          onboarding_completed: body.onboardingCompleted ?? false,
         } as Record<string, unknown>);
-      } catch {
-        // Table might not exist yet if SQL hasn't been run
+      } catch (e) {
+        console.warn('Could not sync user to Supabase:', e);
       }
     }
 
@@ -145,19 +153,29 @@ export async function PATCH(req: NextRequest) {
       role?: UserProfile['role'];
       phone?: string;
       fullName?: string;
+      bloodGroup?: string;
+      medicalNotes?: string;
+      vehicleInfo?: string;
+      emergencyContacts?: UserProfile['emergencyContacts'];
+      onboardingCompleted?: boolean;
     };
-    const { userId, role, phone, fullName } = body;
+    const { userId, role, phone, fullName, bloodGroup, medicalNotes, vehicleInfo, emergencyContacts, onboardingCompleted } = body;
 
-    if (!userId || !role) {
-      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
     // Update memory
     for (const [key, user] of inMemoryProfiles.entries()) {
       if (user.id === userId || user.email === userId) {
-        user.role = role;
+        if (role !== undefined) user.role = role;
         if (phone !== undefined) user.phone = phone;
         if (fullName !== undefined) user.fullName = fullName;
+        if (bloodGroup !== undefined) user.bloodGroup = bloodGroup;
+        if (medicalNotes !== undefined) user.medicalNotes = medicalNotes;
+        if (vehicleInfo !== undefined) user.vehicleInfo = vehicleInfo;
+        if (emergencyContacts !== undefined) user.emergencyContacts = emergencyContacts;
+        if (onboardingCompleted !== undefined) user.onboardingCompleted = onboardingCompleted;
         inMemoryProfiles.set(key, user);
         break;
       }
@@ -165,20 +183,26 @@ export async function PATCH(req: NextRequest) {
 
     if (supabaseAdmin) {
       try {
+        const updatePayload: Record<string, unknown> = {};
+        if (role !== undefined) updatePayload.role = role;
+        if (phone !== undefined) updatePayload.phone = phone;
+        if (fullName !== undefined) updatePayload.full_name = fullName;
+        if (bloodGroup !== undefined) updatePayload.blood_group = bloodGroup;
+        if (medicalNotes !== undefined) updatePayload.medical_notes = medicalNotes;
+        if (vehicleInfo !== undefined) updatePayload.vehicle_info = vehicleInfo;
+        if (emergencyContacts !== undefined) updatePayload.emergency_contacts = emergencyContacts;
+        if (onboardingCompleted !== undefined) updatePayload.onboarding_completed = onboardingCompleted;
+
         await supabaseAdmin
           .from('profiles')
-          .update({
-            role,
-            phone: phone || null,
-            full_name: fullName || undefined,
-          } as Record<string, unknown>)
+          .update(updatePayload)
           .eq('id', userId);
-      } catch {
-        // Ignored
+      } catch (e) {
+        console.warn('Could not update user in Supabase:', e);
       }
     }
 
-    return NextResponse.json({ success: true, message: 'User role updated' });
+    return NextResponse.json({ success: true, message: 'User updated' });
   } catch (err) {
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }

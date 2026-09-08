@@ -26,6 +26,7 @@ import {
   Heart,
 } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import FooterCredit from '@/components/ui/FooterCredit';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
@@ -195,6 +196,17 @@ export default function DispatchDashboardPage() {
 
   const autoCount = emergencies.filter((e) => e.type === 'AUTO').length;
   const manualCount = emergencies.filter((e) => e.type === 'MANUAL').length;
+
+  if (isLoading || !isAuthenticated || user?.role === 'CITIZEN') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-xs">
+        <div className="flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+          <span>Verifying Command Dispatch Authorization...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans">
@@ -540,6 +552,9 @@ export default function DispatchDashboardPage() {
           </div>
         </aside>
       </div>
+
+      {/* Tamper-Proof Persistent Security & Author Credit Footer */}
+      <FooterCredit className="py-2 shrink-0 border-t border-slate-800" showStatus />
     </div>
   );
 }

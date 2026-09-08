@@ -69,12 +69,28 @@ export async function saveEmergency(emergency: Emergency): Promise<void> {
       await supabaseAdmin.from('emergencies').upsert({
         id: emergency.emergencyId,
         device_id: emergency.deviceId,
+        driver_name: emergency.userName || null,
+        driver_phone: emergency.userPhone || null,
+        blood_group: emergency.bloodGroup || null,
+        medical_notes: emergency.medicalNotes || null,
+        vehicle_info: emergency.vehicleInfo || null,
+        emergency_contacts: emergency.emergencyContacts || [],
         type: emergency.type,
+        status: 'ACTIVE',
         lat: emergency.lat,
         lng: emergency.lng,
         active: emergency.active,
         timestamp: new Date(emergency.timestamp).toISOString(),
         last_ping: new Date(emergency.lastPing).toISOString(),
+        speed: emergency.speed ?? null,
+        accuracy: emergency.accuracy ?? null,
+      });
+
+      // Save initial GPS breadcrumb
+      await supabaseAdmin.from('emergency_breadcrumbs').insert({
+        emergency_id: emergency.emergencyId,
+        lat: emergency.lat,
+        lng: emergency.lng,
         speed: emergency.speed ?? null,
         accuracy: emergency.accuracy ?? null,
       });
@@ -139,6 +155,15 @@ export async function updateLocation(
         speed: speed ?? null,
         accuracy: accuracy ?? null,
       }).eq('id', emergencyId);
+
+      // Save GPS breadcrumb trace
+      await supabaseAdmin.from('emergency_breadcrumbs').insert({
+        emergency_id: emergencyId,
+        lat,
+        lng,
+        speed: speed ?? null,
+        accuracy: accuracy ?? null,
+      });
     } catch {
       // Ignored
     }
@@ -172,7 +197,7 @@ export async function deleteEmergency(emergencyId: string): Promise<boolean> {
     try {
       await supabaseAdmin
         .from('emergencies')
-        .update({ active: false })
+        .update({ active: false, status: 'RESOLVED', resolved_at: new Date().toISOString() })
         .eq('id', emergencyId);
     } catch {
       // Ignored
@@ -235,6 +260,12 @@ export async function getAllEmergencies(): Promise<Emergency[]> {
           speed: row.speed !== null ? Number(row.speed) : null,
           accuracy: row.accuracy !== null ? Number(row.accuracy) : null,
           notes: row.notes,
+          userName: row.driver_name || undefined,
+          userPhone: row.driver_phone || undefined,
+          bloodGroup: row.blood_group || undefined,
+          medicalNotes: row.medical_notes || undefined,
+          vehicleInfo: row.vehicle_info || undefined,
+          emergencyContacts: Array.isArray(row.emergency_contacts) ? row.emergency_contacts : [],
         }));
 
         // Keep local cache synced

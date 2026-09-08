@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from '@/types/auth';
 import {
   getStoredSession,
@@ -10,7 +10,11 @@ import {
   registerUser,
   signInWithGoogle,
   loginWithGoogleMock,
+  updateUserProfile,
+  getLocalProfiles,
+  saveLocalProfiles,
 } from '@/lib/auth';
+import { supabase } from '@/lib/supabaseClient';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -26,6 +30,7 @@ interface AuthContextType {
   register: (email: string, fullName: string, role: UserRole, phone?: string) => Promise<UserProfile>;
   loginGoogle: () => Promise<void>;
   loginGoogleDemo: (email: string, name?: string) => Promise<UserProfile>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<UserProfile>;
   logout: () => void;
   isInstallable: boolean;
   installPwa: () => Promise<void>;
@@ -39,13 +44,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
+  // Sync Supabase Auth User with App Profile
+  const syncSupabaseUser = useCallback(async (sbUser: any) => {
+    if (!sbUser || !sbUser.email) return;
+    const cleanEmail = sbUser.email.trim().toLowerCase();
+    const profiles = getLocalProfiles();
+    const found = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+
+    let assignedRole: UserRole = 'CITIZEN';
+    if (found) {
+      assignedRole = found.role;
+    } else if (cleanEmail.includes('admin')) {
+      assignedRole = 'ADMIN';
+    } else if (cleanEmail.includes('dispatch')) {
+      assignedRole = 'DISPATCHER';
+    }
+
+    const resolvedUser: UserProfile = {
+      id: sbUser.id || found?.id || `usr_${Date.now()}`,
+      email: cleanEmail,
+      fullName:
+        sbUser.user_metadata?.full_name ||
+        sbUser.user_metadata?.name ||
+        found?.fullName ||
+        cleanEmail.split('@')[0],
+      avatarUrl: sbUser.user_metadata?.avatar_url || found?.avatarUrl,
+      role: assignedRole,
+      phone: found?.phone,
+      deviceId: found?.deviceId || `DEV-G-${Math.floor(1000 + Math.random() * 9000)}`,
+      bloodGroup: found?.bloodGroup,
+      medicalNotes: found?.medicalNotes,
+      vehicleInfo: found?.vehicleInfo,
+      emergencyContacts: found?.emergencyContacts || [],
+      onboardingCompleted: assignedRole !== 'CITIZEN' ? true : Boolean(found?.onboardingCompleted),
+      createdAt: found?.createdAt || new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+    };
+
+    saveStoredSession({ user: resolvedUser, expiresAt: Date.now() + 30 * 24 * 3600 * 1000 });
+    setUser(resolvedUser);
+
+    // Save to local cache & sync to DB
+    const idx = profiles.findIndex((p) => p.id === resolvedUser.id || p.email.toLowerCase() === cleanEmail);
+    if (idx >= 0) profiles[idx] = resolvedUser;
+    else profiles.push(resolvedUser);
+    saveLocalProfiles(profiles);
+
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resolvedUser),
+      });
+    } catch {}
+  }, []);
+
   // Restore one-time persistent session on initial mount
   useEffect(() => {
     const session = getStoredSession();
     if (session && session.user) {
       setUser(session.user);
+      setIsLoading(false);
+    } else {
+      // Check Supabase session
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (data?.session?.user) {
+            syncSupabaseUser(data.session.user).finally(() => setIsLoading(false));
+          } else {
+            setIsLoading(false);
+          }
+        })
+        .catch(() => {
+          setIsLoading(false);
+        });
     }
-    setIsLoading(false);
+
+    // Subscribe to Supabase Auth State changes
+    const { data: authSubscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        await syncSupabaseUser(session.user);
+      }
+    });
 
     // Register Service Worker for PWA
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -64,9 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
+      authSubscription.subscription.unsubscribe();
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [syncSupabaseUser]);
 
   const login = async (email: string, role: UserRole = 'CITIZEN'): Promise<UserProfile> => {
     setIsLoading(true);
@@ -113,8 +195,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (data: Partial<UserProfile>): Promise<UserProfile> => {
+    setIsLoading(true);
+    try {
+      const updated = await updateUserProfile(data);
+      setUser(updated);
+      return updated;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     clearStoredSession();
+    supabase.auth.signOut().catch(() => {});
     setUser(null);
   };
 
@@ -139,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         loginGoogle,
         loginGoogleDemo,
+        updateProfile,
         logout,
         isInstallable,
         installPwa,

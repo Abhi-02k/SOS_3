@@ -276,3 +276,43 @@ export async function loginWithGoogleMock(email: string, name?: string): Promise
   return user;
 }
 
+/**
+ * Update active user profile and synchronize with storage and API
+ */
+export async function updateUserProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+  const session = getStoredSession();
+  const currentUser = session?.user;
+  if (!currentUser) {
+    throw new Error('No active user session to update');
+  }
+
+  const updatedUser: UserProfile = {
+    ...currentUser,
+    ...updates,
+    lastLogin: new Date().toISOString(),
+  };
+
+  // Save persistent session
+  saveStoredSession({ user: updatedUser, expiresAt: Date.now() + 30 * 24 * 3600 * 1000 });
+
+  // Update in local profiles cache
+  const profiles = getLocalProfiles();
+  const idx = profiles.findIndex((p) => p.id === updatedUser.id || p.email.toLowerCase() === updatedUser.email.toLowerCase());
+  if (idx >= 0) {
+    profiles[idx] = updatedUser;
+  } else {
+    profiles.push(updatedUser);
+  }
+  saveLocalProfiles(profiles);
+
+  // Sync with API
+  try {
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedUser),
+    });
+  } catch {}
+
+  return updatedUser;
+}

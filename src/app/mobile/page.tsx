@@ -24,6 +24,7 @@ import {
 import { Emergency, EmergencyType } from '@/types/emergency';
 import DynamicMobileMap from '@/components/map/DynamicMobileMap';
 import Logo from '@/components/ui/Logo';
+import FooterCredit from '@/components/ui/FooterCredit';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import OnboardingModal from '@/components/auth/OnboardingModal';
@@ -42,10 +43,12 @@ export default function MobileEmergencyPage() {
 
   // Strict Login Gate
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/');
-    } else if (user && !user.onboardingCompleted) {
-      setShowOnboarding(true);
+    if (!isLoading) {
+      if (!isAuthenticated || !user) {
+        router.push('/');
+      } else if (!user.onboardingCompleted) {
+        router.push('/onboarding');
+      }
     }
   }, [isLoading, isAuthenticated, user, router]);
 
@@ -422,6 +425,17 @@ export default function MobileEmergencyPage() {
     }
   };
 
+  if (isLoading || !isAuthenticated || !user || !user.onboardingCompleted) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-xs">
+        <div className="flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+          <span>Verifying Authorized Citizen Beacon...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 max-w-md mx-auto relative select-none">
       {/* Confidential Client Header - NO ADMIN LINKS */}
@@ -723,6 +737,9 @@ export default function MobileEmergencyPage() {
           </div>
         </div>
       )}
+
+      {/* Tamper-Proof Persistent Security & Author Credit Footer */}
+      <FooterCredit showStatus />
     </div>
   );
 }

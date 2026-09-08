@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { UserProfile, UserRole } from '@/types/auth';
 import Logo from '@/components/ui/Logo';
+import FooterCredit from '@/components/ui/FooterCredit';
 import {
   Users,
   Shield,
@@ -35,8 +36,8 @@ export default function AdminUsersPage() {
     if (!isLoading) {
       if (!isAuthenticated) {
         router.push('/');
-      } else if (user?.role === 'CITIZEN') {
-        router.push('/mobile');
+      } else if (user?.role !== 'ADMIN') {
+        router.push(user?.role === 'DISPATCHER' ? '/dashboard' : '/mobile');
       }
     }
   }, [isAuthenticated, isLoading, user, router]);
@@ -88,10 +89,13 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (isLoading || (!isAuthenticated && typeof window !== 'undefined')) {
+  if (isLoading || !isAuthenticated || user?.role !== 'ADMIN') {
     return (
-      <div className="h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm">
-        Verifying Security Credentials...
+      <div className="h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-xs">
+        <div className="flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+          <span>Verifying Administrator Access...</span>
+        </div>
       </div>
     );
   }
@@ -287,6 +291,9 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </main>
+
+      {/* Tamper-Proof Persistent Security & Author Credit Footer */}
+      <FooterCredit showStatus />
     </div>
   );
 }
