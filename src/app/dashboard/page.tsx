@@ -1,0 +1,453 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import DynamicMap from '@/components/map/DynamicMap';
+import { Emergency, EmergencyType } from '@/types/emergency';
+import {
+  ShieldAlert,
+  AlertTriangle,
+  Radio,
+  Clock,
+  Compass,
+  CheckCircle,
+  ExternalLink,
+  Volume2,
+  VolumeX,
+  RefreshCw,
+  PlusCircle,
+  Activity,
+  ChevronRight,
+  MapPin,
+  Flame,
+} from 'lucide-react';
+import Logo from '@/components/ui/Logo';
+
+export default function DispatchDashboardPage() {
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'ALL' | 'AUTO' | 'MANUAL'>('ALL');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const prevEmergencyCountRef = useRef<number>(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Live Digital Clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString('en-US', { hour12: false }));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Audio synthesizer chime for newly arrived emergencies
+  const playAlertChime = useCallback(() => {
+    if (!soundEnabled || typeof window === 'undefined') return;
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new AudioCtx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch {
+      // Audio might require initial user interaction
+    }
+  }, [soundEnabled]);
+
+  // Polling loop: fetch emergencies every 2 seconds
+  const fetchEmergencies = useCallback(async () => {
+    try {
+      const res = await fetch('/api/emergencies', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list: Emergency[] = data.emergencies || [];
+
+      // Check if count increased -> trigger chime
+      if (list.length > prevEmergencyCountRef.current && prevEmergencyCountRef.current !== 0) {
+        playAlertChime();
+      }
+      prevEmergencyCountRef.current = list.length;
+
+      setEmergencies(list);
+      setLastUpdated(new Date());
+
+      // If selected emergency was removed, deselect
+      if (selectedId && !list.some((e) => e.emergencyId === selectedId)) {
+        setSelectedId(null);
+      }
+    } catch (err) {
+      console.error('Error fetching emergencies:', err);
+    }
+  }, [selectedId, playAlertChime]);
+
+  useEffect(() => {
+    fetchEmergencies();
+    const interval = setInterval(fetchEmergencies, 2000);
+    return () => clearInterval(interval);
+  }, [fetchEmergencies]);
+
+  // End an emergency from dashboard
+  const handleEndEmergency = async (id: string) => {
+    try {
+      const res = await fetch('/api/emergency/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emergencyId: id }),
+      });
+
+      if (res.ok) {
+        setEmergencies((prev) => prev.filter((e) => e.emergencyId !== id));
+        if (selectedId === id) setSelectedId(null);
+      }
+    } catch (err) {
+      console.error('Failed to end emergency:', err);
+    }
+  };
+
+  // Quick Simulation Injector for Instant Testing
+  const handleSimulateIncident = async (type: EmergencyType = 'AUTO') => {
+    setIsSimulating(true);
+    // Generate incident around San Francisco with slight jitter
+    const lat = 37.7749 + (Math.random() - 0.5) * 0.05;
+    const lng = -122.4194 + (Math.random() - 0.5) * 0.05;
+    const deviceId = `SIM-${type}-${Math.floor(100 + Math.random() * 900)}`;
+
+    try {
+      const res = await fetch('/api/sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId,
+          lat,
+          lng,
+          type,
+          speed: type === 'AUTO' ? 68 : 0,
+          accuracy: 5,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        await fetchEmergencies();
+        if (data.emergencyId) setSelectedId(data.emergencyId);
+      }
+    } catch (err) {
+      console.error('Failed to inject simulated incident:', err);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  // Filtered incidents
+  const filteredEmergencies = emergencies.filter((e) => {
+    if (filter === 'AUTO') return e.type === 'AUTO';
+    if (filter === 'MANUAL') return e.type === 'MANUAL';
+    return true;
+  });
+
+  const autoCount = emergencies.filter((e) => e.type === 'AUTO').length;
+  const manualCount = emergencies.filter((e) => e.type === 'MANUAL').length;
+
+  return (
+    <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {/* Top Mission Control Bar */}
+      <header className="h-14 bg-slate-900/95 border-b border-slate-800 px-4 flex items-center justify-between z-30 shadow-md">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <Logo size="sm" showSubtitle={false} />
+            <span className="text-[11px] font-mono font-normal text-slate-400 border border-slate-700 bg-slate-800 px-2 py-0.5 rounded">
+              DISPATCH COMMAND
+            </span>
+          </div>
+
+          <div className="hidden md:flex items-center space-x-2 pl-4 border-l border-slate-800 text-xs">
+            <span className="flex items-center space-x-1 text-emerald-400 font-mono">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              <span>LIVE 2S TELEMETRY</span>
+            </span>
+            <span className="text-slate-600">•</span>
+            <span suppressHydrationWarning className="font-mono text-slate-400">CLOCK {isMounted && currentTime ? currentTime : '--:--:--'}</span>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center space-x-2">
+          {/* Sound Toggle */}
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs flex items-center space-x-1 transition-all"
+            title={soundEnabled ? 'Mute Alert Chime' : 'Unmute Alert Chime'}
+          >
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-slate-500" />
+            )}
+          </button>
+
+          {/* Quick Simulation Injector */}
+          <div className="hidden sm:flex items-center space-x-1">
+            <button
+              onClick={() => handleSimulateIncident('AUTO')}
+              disabled={isSimulating}
+              className="px-2.5 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 border border-red-700 text-red-200 text-xs font-bold flex items-center space-x-1.5 transition-all active:scale-95"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+              <span>Simulate Crash</span>
+            </button>
+            <button
+              onClick={() => handleSimulateIncident('MANUAL')}
+              disabled={isSimulating}
+              className="px-2.5 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700 text-amber-200 text-xs font-bold flex items-center space-x-1.5 transition-all active:scale-95"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Simulate SOS</span>
+            </button>
+          </div>
+
+          {/* Open Mobile Client in new tab */}
+          <Link
+            href="/mobile"
+            target="_blank"
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all"
+          >
+            <span>Mobile Beacon</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </header>
+
+      {/* Main Workspace: Sidebar + Map */}
+      <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+        {/* Map taking up primary viewport */}
+        <div className="flex-1 h-[55vh] md:h-full relative order-2 md:order-1">
+          <DynamicMap
+            emergencies={filteredEmergencies}
+            selectedId={selectedId}
+            onSelectEmergency={(id) => setSelectedId(id)}
+            onEndEmergency={handleEndEmergency}
+          />
+
+          {/* Floating Map Legend & Stats Overlay */}
+          <div className="absolute top-4 right-4 z-[1000] bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl p-3 text-xs space-y-2 shadow-2xl pointer-events-auto">
+            <div className="flex items-center justify-between space-x-4">
+              <span className="font-bold text-slate-300">ACTIVE EMERGENCIES</span>
+              <span className="px-2 py-0.5 rounded-full font-mono font-bold bg-red-600 text-white text-[11px]">
+                {emergencies.length}
+              </span>
+            </div>
+            <div className="space-y-1 pt-1 text-[11px]">
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></span>
+                <span>Crash Detected (AUTO): <strong className="text-white">{autoCount}</strong></span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]"></span>
+                <span>Manual SOS Beacon: <strong className="text-white">{manualCount}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar: Incident Command List */}
+        <aside className="w-full md:w-96 h-[45vh] md:h-full bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col order-1 md:order-2 z-20 shadow-2xl">
+          {/* Sidebar Header & Filters */}
+          <div className="p-3 border-b border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+                Active Incidents Queue
+              </span>
+              <span suppressHydrationWarning className="text-[10px] font-mono text-slate-500">
+                Updated {isMounted && lastUpdated ? lastUpdated.toLocaleTimeString() : 'Syncing...'}
+              </span>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg text-xs">
+              <button
+                onClick={() => setFilter('ALL')}
+                className={`py-1 rounded font-semibold transition-colors ${
+                  filter === 'ALL'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                All ({emergencies.length})
+              </button>
+              <button
+                onClick={() => setFilter('AUTO')}
+                className={`py-1 rounded font-semibold transition-colors ${
+                  filter === 'AUTO'
+                    ? 'bg-red-950 text-red-200 border border-red-800/60 shadow-sm'
+                    : 'text-slate-400 hover:text-red-400'
+                }`}
+              >
+                Crash ({autoCount})
+              </button>
+              <button
+                onClick={() => setFilter('MANUAL')}
+                className={`py-1 rounded font-semibold transition-colors ${
+                  filter === 'MANUAL'
+                    ? 'bg-amber-950 text-amber-200 border border-amber-800/60 shadow-sm'
+                    : 'text-slate-400 hover:text-amber-400'
+                }`}
+              >
+                SOS ({manualCount})
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Incident Cards */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2.5 divide-y divide-slate-800/40">
+            {filteredEmergencies.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-3">
+                <CheckCircle className="w-12 h-12 text-emerald-500/50" />
+                <div>
+                  <h3 className="text-sm font-bold text-slate-300">All Sectors Clear</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    No active emergency beacons or crash impacts detected.
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-col gap-2 w-full">
+                  <button
+                    onClick={() => handleSimulateIncident('AUTO')}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition-colors"
+                  >
+                    Simulate Auto Crash Event
+                  </button>
+                </div>
+              </div>
+            ) : (
+              filteredEmergencies.map((incident) => {
+                const isSelected = incident.emergencyId === selectedId;
+                const isAuto = incident.type === 'AUTO';
+                const timeAgo = Math.max(
+                  0,
+                  Math.round((Date.now() - incident.timestamp) / 1000)
+                );
+
+                return (
+                  <div
+                    key={incident.emergencyId}
+                    onClick={() => setSelectedId(incident.emergencyId)}
+                    className={`pt-2.5 first:pt-0 cursor-pointer transition-all`}
+                  >
+                    <div
+                      className={`p-3 rounded-xl border transition-all ${
+                        isSelected
+                          ? 'bg-slate-800/90 border-blue-500 ring-1 ring-blue-500/50 shadow-lg'
+                          : isAuto
+                          ? 'bg-red-950/20 border-red-900/40 hover:bg-red-950/40'
+                          : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      {/* Badge & Timestamp Header */}
+                      <div className="flex items-center justify-between pb-2">
+                        <span
+                          className={`inline-flex items-center space-x-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                            isAuto
+                              ? 'bg-red-900 text-red-200 border border-red-700'
+                              : 'bg-amber-900 text-amber-200 border border-amber-700'
+                          }`}
+                        >
+                          {isAuto ? (
+                            <ShieldAlert className="w-3 h-3 text-red-300" />
+                          ) : (
+                            <AlertTriangle className="w-3 h-3 text-amber-300" />
+                          )}
+                          <span>{isAuto ? 'AUTO IMPACT' : 'MANUAL SOS'}</span>
+                        </span>
+
+                        <span className="text-[10px] font-mono text-slate-400 flex items-center space-x-1">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span>{timeAgo}s ago</span>
+                        </span>
+                      </div>
+
+                      {/* Device & Coords */}
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white text-sm">
+                            {incident.deviceId}
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {incident.emergencyId.substring(0, 16)}...
+                          </span>
+                        </div>
+
+                        <div className="flex items-center space-x-1 text-slate-400 text-[11px] font-mono">
+                          <MapPin className="w-3 h-3 text-blue-400 shrink-0" />
+                          <span>
+                            {incident.lat.toFixed(4)}, {incident.lng.toFixed(4)}
+                          </span>
+                          {incident.speed ? (
+                            <span className="text-slate-300 font-semibold pl-2">
+                              • {incident.speed} km/h
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center space-x-2 pt-3 border-t border-slate-800/60 mt-2.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedId(incident.emergencyId);
+                          }}
+                          className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 flex items-center justify-center space-x-1 transition-all"
+                        >
+                          <Compass className="w-3 h-3 text-blue-400" />
+                          <span>Locate</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEndEmergency(incident.emergencyId);
+                          }}
+                          className="flex-1 py-1.5 bg-red-950/50 hover:bg-red-900 border border-red-700 text-red-200 text-xs font-semibold rounded-lg flex items-center justify-center space-x-1 transition-all"
+                        >
+                          <CheckCircle className="w-3 h-3 text-emerald-400" />
+                          <span>Resolve</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}

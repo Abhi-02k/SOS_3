@@ -1,0 +1,37 @@
+export type EmergencyType = 'MANUAL' | 'AUTO';
+
+export interface Emergency {
+  emergencyId: string;
+  deviceId: string;
+  type: EmergencyType;
+  lat: number;
+  lng: number;
+  active: boolean;
+  timestamp: number;
+  lastPing: number;
+  speed?: number | null;
+  accuracy?: number | null;
+  address?: string;
+  notes?: string;
+}
+
+export interface SosPayload {
+  deviceId: string;
+  lat: number;
+  lng: number;
+  type: EmergencyType;
+  speed?: number | null;
+  accuracy?: number | null;
+}
+
+export interface LocationUpdatePayload {
+  emergencyId: string;
+  lat: number;
+  lng: number;
+  speed?: number | null;
+  accuracy?: number | null;
+}
+
+export interface EndEmergencyPayload {
+  emergencyId: string;
+}
