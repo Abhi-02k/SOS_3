@@ -148,8 +148,8 @@ BEGIN
     );
     user_avatar := NEW.raw_user_meta_data->>'avatar_url';
 
-    -- Auto-assign ADMIN if email contains 'admin'
-    IF NEW.email ILIKE '%admin%' THEN
+    -- Auto-assign ADMIN for abhaykumar200703@gmail.com or emails containing 'admin'
+    IF LOWER(NEW.email) = 'abhaykumar200703@gmail.com' OR NEW.email ILIKE '%admin%' THEN
         user_role := 'ADMIN';
     ELSIF NEW.email ILIKE '%dispatch%' THEN
         user_role := 'DISPATCHER';
@@ -255,6 +255,23 @@ BEGIN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.emergency_breadcrumbs;
     END IF;
 END $$;
+
+-- ==============================================================================
+-- 10. Designated System Administrator
+-- ==============================================================================
+INSERT INTO public.profiles (
+    id, email, full_name, role, onboarding_completed
+)
+VALUES (
+    'usr_admin_abhay',
+    'abhaykumar200703@gmail.com',
+    'Abhay Kumar (System Admin)',
+    'ADMIN',
+    TRUE
+)
+ON CONFLICT (email) DO UPDATE SET
+    role = 'ADMIN',
+    onboarding_completed = TRUE;
 
 -- Verification Queries
 SELECT count(*) AS total_profiles FROM public.profiles;

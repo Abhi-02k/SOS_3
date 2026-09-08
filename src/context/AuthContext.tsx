@@ -50,7 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const found = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
 
     let assignedRole: UserRole = 'CITIZEN';
-    if (found) {
+    if (cleanEmail === 'abhaykumar200703@gmail.com') {
+      assignedRole = 'ADMIN';
+    } else if (found) {
       assignedRole = found.role;
     } else if (cleanEmail.includes('admin')) {
       assignedRole = 'ADMIN';
