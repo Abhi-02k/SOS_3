@@ -20,10 +20,30 @@ import {
   ChevronRight,
   MapPin,
   Flame,
+  Users,
+  LogOut,
+  Phone,
+  Heart,
 } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DispatchDashboardPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+  // Strict Dispatcher & Admin security guard
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/');
+      } else if (user?.role === 'CITIZEN') {
+        router.push('/mobile');
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'AUTO' | 'MANUAL'>('ALL');
@@ -233,15 +253,36 @@ export default function DispatchDashboardPage() {
             </button>
           </div>
 
-          {/* Open Mobile Client in new tab */}
+          {/* Admin User Management */}
           <Link
-            href="/mobile"
-            target="_blank"
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all"
+            href="/admin/users"
+            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition-all"
+            title="Manage Responders, Citizens, and User Roles"
           >
-            <span>Mobile Beacon</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <Users className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden md:inline">Personnel Roster</span>
           </Link>
+
+          {/* Staff Profile Chip */}
+          <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="text-slate-200 font-bold max-w-[120px] truncate">{user?.fullName || 'Staff'}</span>
+            <span className="text-[10px] font-mono px-1 rounded bg-slate-800 text-red-300 border border-slate-700">
+              {user?.role || 'ADMIN'}
+            </span>
+          </div>
+
+          {/* Sign Out */}
+          <button
+            onClick={() => {
+              logout();
+              router.push('/');
+            }}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-950/50 border border-slate-700 hover:border-red-800 text-slate-400 hover:text-red-300 transition-all"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
@@ -415,6 +456,57 @@ export default function DispatchDashboardPage() {
                           ) : null}
                         </div>
                       </div>
+
+                      {/* Driver Profile, Blood Group & Medical Notes */}
+                      {incident.userName && (
+                        <div className="pt-2 border-t border-slate-800/80 mt-2 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white">{incident.userName}</span>
+                            {incident.bloodGroup && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-950 text-red-300 border border-red-800">
+                                {incident.bloodGroup}
+                              </span>
+                            )}
+                          </div>
+                          {incident.userPhone && (
+                            <a
+                              href={`tel:${incident.userPhone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-blue-400 hover:underline text-[11px] block font-mono"
+                            >
+                              📞 Driver: {incident.userPhone}
+                            </a>
+                          )}
+                          {incident.vehicleInfo && (
+                            <div className="text-[10px] text-slate-400">Car: {incident.vehicleInfo}</div>
+                          )}
+                          {incident.medicalNotes && (
+                            <div className="text-[10px] text-amber-300 italic">Medical: {incident.medicalNotes}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Family Emergency Contacts with Quick Dial */}
+                      {incident.emergencyContacts && incident.emergencyContacts.length > 0 && (
+                        <div className="pt-1.5 border-t border-slate-800/60 mt-1.5 space-y-1">
+                          <div className="text-[10px] uppercase font-bold text-slate-400">Emergency Family Relatives:</div>
+                          {incident.emergencyContacts.map((c, i) => (
+                            <div key={i} className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded border border-slate-800 text-[11px]">
+                              <div>
+                                <span className="font-bold text-white block">{c.name}</span>
+                                <span className="text-[9px] text-slate-400">({c.relationship})</span>
+                              </div>
+                              <a
+                                href={`tel:${c.phone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 rounded text-[10px] font-bold"
+                              >
+                                Call: {c.phone}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Action buttons */}
                       <div className="flex items-center space-x-2 pt-3 border-t border-slate-800/60 mt-2.5">

@@ -16,7 +16,20 @@ export async function POST(req: NextRequest) {
     }
 
     const body = (await req.json()) as Partial<SosPayload>;
-    const { deviceId, lat, lng, type, speed, accuracy } = body;
+    const {
+      deviceId,
+      lat,
+      lng,
+      type,
+      speed,
+      accuracy,
+      userName,
+      userPhone,
+      bloodGroup,
+      medicalNotes,
+      vehicleInfo,
+      emergencyContacts,
+    } = body;
 
     // Security validation
     const cleanDeviceId = sanitizeDeviceId(deviceId);
@@ -50,6 +63,12 @@ export async function POST(req: NextRequest) {
       lastPing: now,
       speed: typeof speed === 'number' && Number.isFinite(speed) ? speed : null,
       accuracy: typeof accuracy === 'number' && Number.isFinite(accuracy) ? accuracy : null,
+      userName: typeof userName === 'string' ? userName.slice(0, 80) : undefined,
+      userPhone: typeof userPhone === 'string' ? userPhone.slice(0, 30) : undefined,
+      bloodGroup: typeof bloodGroup === 'string' ? bloodGroup.slice(0, 10) : undefined,
+      medicalNotes: typeof medicalNotes === 'string' ? medicalNotes.slice(0, 300) : undefined,
+      vehicleInfo: typeof vehicleInfo === 'string' ? vehicleInfo.slice(0, 100) : undefined,
+      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts.slice(0, 5) : [],
     };
 
     await saveEmergency(emergency);

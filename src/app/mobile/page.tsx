@@ -15,14 +15,44 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
-  ExternalLink,
   ChevronLeft,
+  Bell,
+  Download,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
 import { Emergency, EmergencyType } from '@/types/emergency';
 import DynamicMobileMap from '@/components/map/DynamicMobileMap';
 import Logo from '@/components/ui/Logo';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import OnboardingModal from '@/components/auth/OnboardingModal';
+import {
+  requestNotificationPermission,
+  hasNotificationPermission,
+  sendLocalNotification,
+} from '@/lib/notifications';
 
 export default function MobileEmergencyPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout, isInstallable, installPwa } = useAuth();
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [notificationsGranted, setNotificationsGranted] = useState(false);
+
+  // Strict Login Gate
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/');
+    } else if (user && !user.onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
+  useEffect(() => {
+    setNotificationsGranted(hasNotificationPermission());
+  }, []);
+
   // Device & GPS State
   const [deviceId, setDeviceId] = useState<string>('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -157,7 +187,7 @@ export default function MobileEmergencyPage() {
       }
 
       const currentPosition = coordsRef.current || { lat: 37.7749, lng: -122.4194 };
-      const currentDevId = deviceIdRef.current || 'GUARDIAN-MOBILE';
+      const currentDevId = deviceIdRef.current || user?.deviceId || 'GUARDIAN-MOBILE';
 
       try {
         const res = await fetch('/api/sos', {
@@ -170,6 +200,12 @@ export default function MobileEmergencyPage() {
             type,
             speed: gpsSpeed,
             accuracy: gpsAccuracy,
+            userName: user?.fullName,
+            userPhone: user?.phone,
+            bloodGroup: user?.bloodGroup,
+            medicalNotes: user?.medicalNotes,
+            vehicleInfo: user?.vehicleInfo,
+            emergencyContacts: user?.emergencyContacts || [],
           }),
         });
 
@@ -186,7 +222,7 @@ export default function MobileEmergencyPage() {
         alert('Network error communicating with emergency dispatch server.');
       }
     },
-    [gpsSpeed, gpsAccuracy]
+    [gpsSpeed, gpsAccuracy, user]
   );
 
   // Trigger 10-second crash countdown
@@ -195,6 +231,12 @@ export default function MobileEmergencyPage() {
       setIsCountingDown(true);
       setCountdown(10);
       setCountdownTriggerType(type);
+
+      // Send local push notification
+      sendLocalNotification(
+        'VEHICULAR CRASH DETECTED!',
+        'Severe impact collision detected. Emergency services & family relatives dispatching in 10s.'
+      );
 
       // Play audio loop
       playAlarmTone();
@@ -382,16 +424,33 @@ export default function MobileEmergencyPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 max-w-md mx-auto relative select-none">
-      {/* Top Header */}
-      <header className="flex items-center justify-between py-2 border-b border-slate-800">
+      {/* Confidential Client Header - NO ADMIN LINKS */}
+      <header className="flex items-center justify-between py-2.5 border-b border-slate-800">
         <div className="flex items-center space-x-2">
-          <Link href="/" className="p-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white">
+          <Link href="/" className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <Logo size="sm" showSubtitle={false} />
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Notification Permission Request */}
+          <button
+            onClick={async () => {
+              const res = await requestNotificationPermission();
+              setNotificationsGranted(res === 'granted');
+            }}
+            className={`p-1.5 rounded-lg border text-xs transition-all ${
+              notificationsGranted
+                ? 'bg-slate-900 border-slate-800 text-emerald-400'
+                : 'bg-blue-950/60 border-blue-700 text-blue-300 animate-pulse'
+            }`}
+            title={notificationsGranted ? 'Push Alerts Active' : 'Enable Emergency Push Alerts'}
+          >
+            <Bell className="w-4 h-4" />
+          </button>
+
+          {/* Sound Alarm Mute */}
           <button
             onClick={() => setAudioMuted(!audioMuted)}
             className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -399,16 +458,36 @@ export default function MobileEmergencyPage() {
           >
             {audioMuted ? <VolumeX className="w-4 h-4 text-amber-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
           </button>
-          <Link
-            href="/dashboard"
-            target="_blank"
-            className="px-2 py-1 text-xs font-semibold bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-md text-slate-300 flex items-center space-x-1"
+
+          {/* PWA Download to Device */}
+          {isInstallable && (
+            <button
+              onClick={installPwa}
+              className="p-1.5 rounded-lg bg-red-950/60 border border-red-700 text-red-200 text-xs font-bold"
+              title="Install SOS Guardian as Native App"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              logout();
+              router.push('/');
+            }}
+            className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-800 text-slate-400 hover:text-red-300 transition-all"
+            title="Sign Out"
           >
-            <span>Command</span>
-            <ExternalLink className="w-3 h-3" />
-          </Link>
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
+
+      {/* First-time Relative & Medical Onboarding Modal */}
+      {showOnboarding && (
+        <OnboardingModal onComplete={() => setShowOnboarding(false)} />
+      )}
 
       {/* Main Body */}
       <main className="flex-1 flex flex-col justify-around py-4 space-y-4">

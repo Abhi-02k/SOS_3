@@ -43,14 +43,14 @@ EXECUTE FUNCTION update_updated_at_column();
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE public.emergencies ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access to active emergencies (for command dashboard and mobile clients)
+-- Allow public read access to active emergencies
 DROP POLICY IF EXISTS "Allow public read access to active emergencies" ON public.emergencies;
 CREATE POLICY "Allow public read access to active emergencies"
 ON public.emergencies
 FOR SELECT
 USING (true);
 
--- Allow authenticated/service role full read & write access
+-- Allow service role full read & write access
 DROP POLICY IF EXISTS "Allow service role full access" ON public.emergencies;
 CREATE POLICY "Allow service role full access"
 ON public.emergencies
@@ -58,8 +58,7 @@ FOR ALL
 USING (true)
 WITH CHECK (true);
 
--- 5. Enable Supabase Realtime Replication (Live WebSockets)
--- Allows the dispatch dashboard to receive instant Postgres database changes
+-- 5. Enable Supabase Realtime (Live WebSockets)
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -72,5 +71,37 @@ BEGIN
     END IF;
 END $$;
 
+-- 6. User Profiles Table for Role-Based Access Control (Admin, Dispatcher, Citizen)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'DISPATCHER', 'CITIZEN')),
+    phone TEXT DEFAULT NULL,
+    device_id TEXT DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles (role);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles (email);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read profiles" ON public.profiles;
+CREATE POLICY "Allow public read profiles" ON public.profiles FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow service role full access to profiles" ON public.profiles;
+CREATE POLICY "Allow service role full access to profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+
+-- Seed Initial Demo Users
+INSERT INTO public.profiles (id, email, full_name, role, device_id)
+VALUES 
+  ('usr_admin_001', 'admin@guardian.sos', 'Commander Alex Vance', 'ADMIN', 'DISPATCH-HQ-01'),
+  ('usr_disp_002', 'dispatcher@guardian.sos', 'Officer Sarah Connor', 'DISPATCHER', 'DISPATCH-UNIT-02'),
+  ('usr_citizen_003', 'citizen@guardian.sos', 'John Doe (Driver)', 'CITIZEN', 'GUARDIAN-MOBILE-7821')
+ON CONFLICT (email) DO NOTHING;
+
 -- Verification query
-SELECT * FROM public.emergencies ORDER BY last_ping DESC LIMIT 10;
+SELECT count(*) AS active_emergencies FROM public.emergencies;
+SELECT count(*) AS total_profiles FROM public.profiles;

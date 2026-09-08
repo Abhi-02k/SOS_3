@@ -1,3 +1,5 @@
+import { EmergencyContact } from './auth';
+
 export type EmergencyType = 'MANUAL' | 'AUTO';
 
 export interface Emergency {
@@ -13,6 +15,14 @@ export interface Emergency {
   accuracy?: number | null;
   address?: string;
   notes?: string;
+
+  // Family & Medical First-Responder Telemetry
+  userName?: string;
+  userPhone?: string;
+  bloodGroup?: string;
+  medicalNotes?: string;
+  vehicleInfo?: string;
+  emergencyContacts?: EmergencyContact[];
 }
 
 export interface SosPayload {
@@ -22,6 +32,14 @@ export interface SosPayload {
   type: EmergencyType;
   speed?: number | null;
   accuracy?: number | null;
+
+  // Attached identity and family contact details
+  userName?: string;
+  userPhone?: string;
+  bloodGroup?: string;
+  medicalNotes?: string;
+  vehicleInfo?: string;
+  emergencyContacts?: EmergencyContact[];
 }
 
 export interface LocationUpdatePayload {

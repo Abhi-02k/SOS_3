@@ -179,6 +179,52 @@ export default function EmergencyMap({
                     </div>
                   </div>
 
+                  {/* Citizen Identity & Medical Notes */}
+                  {incident.userName && (
+                    <div className="pt-2 border-t border-slate-700/60 text-xs space-y-0.5">
+                      <div className="font-bold text-white flex items-center justify-between">
+                        <span>{incident.userName}</span>
+                        {incident.bloodGroup && (
+                          <span className="px-1.5 py-0.5 bg-red-950 text-red-300 border border-red-800 rounded text-[10px]">
+                            Blood: {incident.bloodGroup}
+                          </span>
+                        )}
+                      </div>
+                      {incident.userPhone && (
+                        <a href={`tel:${incident.userPhone}`} className="text-blue-400 hover:underline text-[11px] block font-mono">
+                          Driver: {incident.userPhone}
+                        </a>
+                      )}
+                      {incident.vehicleInfo && (
+                        <div className="text-[10px] text-slate-400">Car: {incident.vehicleInfo}</div>
+                      )}
+                      {incident.medicalNotes && (
+                        <div className="text-[10px] text-amber-300 italic">Medical: {incident.medicalNotes}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Emergency Family Relative Contacts */}
+                  {incident.emergencyContacts && incident.emergencyContacts.length > 0 && (
+                    <div className="pt-2 border-t border-slate-700/60 space-y-1">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">Family Emergency Contacts:</div>
+                      {incident.emergencyContacts.map((c, i) => (
+                        <div key={i} className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded border border-slate-800 text-[11px]">
+                          <div>
+                            <span className="font-bold text-white block">{c.name}</span>
+                            <span className="text-[9px] text-slate-400">({c.relationship})</span>
+                          </div>
+                          <a
+                            href={`tel:${c.phone}`}
+                            className="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 rounded text-[10px] font-bold"
+                          >
+                            Call: {c.phone}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <button
                     onClick={() => onEndEmergency(incident.emergencyId)}
                     className="w-full mt-2 py-1.5 px-3 bg-red-900/60 hover:bg-red-800 border border-red-600 rounded text-xs font-bold text-red-100 flex items-center justify-center space-x-1 transition-all"
